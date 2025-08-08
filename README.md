@@ -30,3 +30,8 @@ Run tests:
 ```bash
 npm test
 ```
+
+## API
+
+- `GET /professions` – returns the list of professions with fields `id`, `name`, `description`, and `image`.
+

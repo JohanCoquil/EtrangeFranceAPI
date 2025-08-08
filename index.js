@@ -20,6 +20,18 @@ async function start() {
       res.send('Hello, Etrange France API!');
     });
 
+    app.get('/professions', async (req, res) => {
+      try {
+        const [rows] = await req.app.locals.db.query(
+          'SELECT id, name, description, image FROM professions'
+        );
+        res.json(rows);
+      } catch (err) {
+        console.error('Error fetching professions:', err);
+        res.status(500).json({ error: 'Failed to fetch professions' });
+      }
+    });
+
     app.listen(port, () => {
       console.log(`Server listening on port ${port}`);
     });
