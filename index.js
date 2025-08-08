@@ -1,11 +1,17 @@
+require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
+console.log('Booting… cwd=', process.cwd(), 'envs:', !!process.env.DB_HOST);
+
+app.get('/health', (req, res) => res.json({ ok: true }));
+
 async function start() {
   try {
+    console.log('Connecting to ',process.env.DB_HOST,process.env.DB_NAME);
     const connection = await mysql.createConnection({
       host: process.env.DB_HOST || 'localhost',
       user: process.env.DB_USER || 'yoxigen_EtrFra',
