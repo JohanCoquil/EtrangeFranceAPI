@@ -20,7 +20,7 @@ By default, the server attempts to connect to a MySQL database using the followi
 
 - host: `localhost`
 - user: `yoxigen_EtrFra`
-- password: `x05cl5FLuyF!`
+- password: `****!`
 - database: `yoxigen_EtrFra`
 
 Override these values by setting the environment variables `DB_HOST`, `DB_USER`, `DB_PASSWORD`, and `DB_NAME`.
