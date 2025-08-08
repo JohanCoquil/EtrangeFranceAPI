@@ -1,50 +1,71 @@
-require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
+const fs = require('fs');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-console.log('Booting… cwd=', process.cwd(), 'envs:', !!process.env.DB_HOST);
+let db = null;
+let dbError = null;
 
-app.get('/health', (req, res) => res.json({ ok: true }));
-
-async function start() {
+function log(line) {
   try {
-    console.log('Connecting to ',process.env.DB_HOST,process.env.DB_NAME);
-    const connection = await mysql.createConnection({
-      host: process.env.DB_HOST || 'localhost',
-      user: process.env.DB_USER || 'yoxigen_EtrFra',
-      password: process.env.DB_PASSWORD || 'x05cl5FLuyF!',
-      database: process.env.DB_NAME || 'yoxigen_EtrFra'
-    });
+    fs.appendFileSync('app.log', `${new Date().toISOString()} ${line}\n`);
+  } catch {}
+  console.log(line);
+}
 
-    console.log('Connected to MySQL database');
-    app.locals.db = connection;
-
-    app.get('/', (req, res) => {
-      res.send('Hello, Etrange France API!');
+async function connectDB() {
+  try {
+    log(`DB connect → host=${process.env.DB_HOST} db=${process.env.DB_NAME} user=${process.env.DB_USER}`);
+    db = await mysql.createPool({
+      host: process.env.DB_HOST,         // <-- mets bien tes vars dans cPanel
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_NAME,
+      waitForConnections: true,
+      connectionLimit: 5,
+      queueLimit: 0,
     });
-
-    app.get('/professions', async (req, res) => {
-      try {
-        const [rows] = await req.app.locals.db.query(
-          'SELECT id, name, description, image FROM professions'
-        );
-        res.json(rows);
-      } catch (err) {
-        console.error('Error fetching professions:', err);
-        res.status(500).json({ error: 'Failed to fetch professions' });
-      }
-    });
-
-    app.listen(port, () => {
-      console.log(`Server listening on port ${port}`);
-    });
+    await db.query('SELECT 1'); // smoke test
+    log('✅ MySQL OK');
+    dbError = null;
   } catch (err) {
-    console.error('Failed to connect to MySQL:', err);
-    process.exit(1);
+    db = null;
+    dbError = err;
+    log('💥 MySQL ERROR: ' + (err && err.stack || err));
   }
 }
 
-start();
+app.get('/health', (req, res) => {
+  res.status(db ? 200 : 500).json({
+    ok: !!db,
+    dbError: dbError ? (dbError.code || dbError.message) : null,
+  });
+});
+
+app.get('/professions', async (req, res) => {
+  if (!db) return res.status(500).json({ error: 'DB not connected' });
+  try {
+    const [rows] = await db.query('SELECT id, name, description, image FROM professions');
+    res.json(rows);
+  } catch (err) {
+    log('💥 /professions error: ' + (err && err.stack || err));
+    res.status(500).json({ error: err.code || err.message });
+  }
+});
+
+async function start() {
+  log('Booting app…');
+  await connectDB(); // Essai 1 au boot
+  app.listen(port, () => log(`Server listening on port ${port}`));
+
+  // Retente la DB périodiquement si échec (au cas où credentials/host corrigés après coup)
+  setInterval(() => {
+    if (!db) connectDB();
+  }, 30000);
+}
+
+start().catch(err => {
+  log('💥 Startup fatal: ' + (err && err.stack || err));
+});
